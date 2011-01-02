@@ -11,6 +11,7 @@ import java.io.DataOutputStream
 import java.nio.ByteBuffer
 import scala.collection.{ mutable, immutable }
 import mutable.{ ListBuffer, LinkedHashSet }
+import scala.tools.funnel.{ Memo, FunnelManager }
 import scala.reflect.generic.{ PickleFormat, PickleBuffer }
 import scala.tools.nsc.io.AbstractFile
 import scala.tools.nsc.symtab._
@@ -31,7 +32,6 @@ abstract class GenJVM extends SubComponent with GenJVMUtil with GenAndroid {
   import icodes._
   import icodes.opcodes._
   import definitions.{
-    NullClass, RuntimeNullClass, NothingClass, RuntimeNothingClass,
     AnyClass, ObjectClass, ThrowsClass, ThrowableClass, ClassfileAnnotationClass,
     SerializableClass, StringClass, ClassClass, FunctionClass,
     DeprecatedAttr, SerializableAttr, SerialVersionUIDAttr, VolatileAttr,
@@ -61,6 +61,8 @@ abstract class GenJVM extends SubComponent with GenJVMUtil with GenAndroid {
 
       classes.values foreach codeGenerator.genClass
       classes.clear
+      FunnelManager.processActive()
+      // XXX clear javaNameMemo if necessary
     }
 
     def apply(cls: IClass) {
@@ -82,6 +84,9 @@ abstract class GenJVM extends SubComponent with GenJVMUtil with GenAndroid {
    */
   class BytecodeGenerator extends BytecodeUtil {
     def debugLevel = settings.debuginfo.indexOfChoice
+    
+    private val innerClassBuffer = new LinkedHashSet[Symbol]
+
     import scala.tools.reflect.SigParser
     def verifySig(sym: Symbol, sig: String) = {
       val ok = 
@@ -142,12 +147,12 @@ abstract class GenJVM extends SubComponent with GenJVMUtil with GenAndroid {
     val emitLines  = debugLevel >= 2
     val emitVars   = debugLevel >= 3
     
-    override def javaName(sym: Symbol): String = {
+    def javaName(sym: Symbol): String = {
       if (sym.isClass && !sym.rawowner.isPackageClass && !sym.isModuleClass)
         innerClassBuffer += sym
-      
-      super.javaName(sym)
-    }    
+
+      javaNameLogic(sym)
+    }
 
     /** Write a class to disk, adding the Scala signature (pickled type
      *  information) and inner classes.
@@ -208,8 +213,6 @@ abstract class GenJVM extends SubComponent with GenJVMUtil with GenAndroid {
     var serialVUID: Option[Long] = None
     var isRemoteClass: Boolean = false
     var isParcelableClass = false
-
-    private val innerClassBuffer = new ListBuffer[Symbol]
 
     def genClass(c: IClass) {
       clasz = c
@@ -559,7 +562,7 @@ abstract class GenJVM extends SubComponent with GenJVMUtil with GenAndroid {
     }
 
     def addAnnotations(jmember: JMember, annotations: List[AnnotationInfo]) {
-      if (annotations.exists(_.atp.typeSymbol == definitions.DeprecatedAttr)) {
+      if (annotations.exists(_.atp.typeSymbol == DeprecatedAttr)) {
         val attr = jmember.getContext().JOtherAttribute(
           jmember.getJClass(), jmember, tpnme.DeprecatedATTR.toString,
           new Array[Byte](0), 0)
@@ -617,7 +620,6 @@ abstract class GenJVM extends SubComponent with GenJVMUtil with GenAndroid {
           else outerName
         }
       }
-
       def innerName(innerSym: Symbol): String = 
         if (innerSym.isAnonymousClass || innerSym.isAnonymousFunction)
           null

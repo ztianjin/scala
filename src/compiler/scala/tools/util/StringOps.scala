@@ -24,6 +24,9 @@ object StringOps {
     val ys = oempty(xs: _*)
     if (ys.isEmpty) orElse else ys mkString sep
   }
+  def truncateTo(maxLength: Int, s: String) =
+    if (s.length <= maxLength) s
+    else (s take (maxLength - 3)) + "..."
   
   def decompose(str: String, sep: Char): List[String] = {
     def ws(start: Int): List[String] =

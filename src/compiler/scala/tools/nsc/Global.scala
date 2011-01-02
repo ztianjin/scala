@@ -13,7 +13,9 @@ import scala.tools.util.Profiling
 import scala.collection.{ mutable, immutable }
 import io.{ SourceReader, AbstractFile, Path }
 import reporters.{ Reporter, ConsoleReporter }
-import util.{ Exceptional, ClassPath, SourceFile, Statistics, BatchSourceFile, ScriptSourceFile, ShowPickled, returning }
+import util.{ Exceptional, ClassPath, SourceFile, Statistics, BatchSourceFile, ScriptSourceFile, ShowPickled }
+import util.{ returning }
+import scala.tools.funnel.{ Funnel, Caller }
 import reflect.generic.{ PickleBuffer, PickleFormat }
 
 import symtab.{ Flags, SymbolTable, SymbolLoaders }
@@ -118,6 +120,16 @@ class Global(var settings: Settings, var reporter: Reporter) extends SymbolTable
 
   val nodeToString = nodePrinters.nodeToString
   val treeBrowser = treeBrowsers.create()
+  
+  /** If -Dscala.timings was given, the memoized functions will track
+   *  statistics and print them on jvm exit.
+   */
+  def memoize[K, V](f: K => V)(implicit caller: Caller): Funnel[K, V] = memoize(0, f)
+  def memoize[K, V](shift: Int, f: K => V)(implicit caller: Caller): Funnel[K, V] = Funnel.memoize(f)
+
+  def originize[K, V](f: K => V)(implicit caller: Caller): Funnel[K, V] = Funnel.originize(f)
+  def originize[T1, T2, V](f: (T1, T2) => V)(implicit caller: Caller): (T1, T2) => V =
+    scala.Function.untupled(originize(f.tupled))
 
   // ------------ Hooks for interactive mode-------------------------
 
@@ -149,6 +161,7 @@ class Global(var settings: Settings, var reporter: Reporter) extends SymbolTable
     
   def informComplete(msg: String): Unit    = reporter.withoutTruncating(inform(msg))
   def informProgress(msg: String)          = if (opt.verbose) inform("[" + msg + "]")
+  def informDebug(msg: String)             = if (opt.debug) inform("[" + msg + "]")
   def inform[T](msg: String, value: T): T  = returning(value)(x => inform(msg + x))
   def informTime(msg: String, start: Long) = informProgress(elapsedMessage(msg, start))
 
@@ -236,7 +249,9 @@ class Global(var settings: Settings, var reporter: Reporter) extends SymbolTable
 
     // XXX: short term, but I can't bear to add another option.
     // scalac -Dscala.timings will make this true.
-    def timings       = sys.props contains "scala.timings"
+    def timings = sys.props contains "scala.timings"
+    def memo    = sys.props contains "scala.funnel.memo"
+    def nomemo  = sys.props contains "scala.funnel.nomemo"
     
     def debug           = settings.debug.value
     def deprecation     = settings.deprecation.value

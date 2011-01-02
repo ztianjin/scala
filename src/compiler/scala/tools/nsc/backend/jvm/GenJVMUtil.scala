@@ -8,8 +8,12 @@ package scala.tools.nsc
 package backend.jvm
 
 import scala.collection.{ mutable, immutable }
-
+import scala.tools.funnel.{ Memo, Caller }
+import scala.tools.nsc.io.AbstractFile
+import scala.tools.nsc.symtab._
+import scala.tools.nsc.symtab.classfile.ClassfileConstants._
 import ch.epfl.lamp.fjbg._
+import JAccessFlags._
 
 trait GenJVMUtil {
   self: GenJVM =>
@@ -32,21 +36,60 @@ trait GenJVMUtil {
     LONG   -> new JObjectType("java.lang.Long"),
     FLOAT  -> new JObjectType("java.lang.Float"),
     DOUBLE -> new JObjectType("java.lang.Double")
-  ) 
-
-  private val javaNameCache = {
-    val map = new mutable.WeakHashMap[Symbol, String]()
-    map ++= List(
-      NothingClass        -> RuntimeNothingClass.fullName('/'),
-      RuntimeNothingClass -> RuntimeNothingClass.fullName('/'),
-      NullClass           -> RuntimeNullClass.fullName('/'),
-      RuntimeNullClass    -> RuntimeNullClass.fullName('/')    
+  )
+  val javaTypeFixed = immutable.Map[TypeKind, JType](
+    UNIT   -> JType.VOID,
+    BOOL   -> JType.BOOLEAN,
+    BYTE   -> JType.BYTE,
+    SHORT  -> JType.SHORT,
+    CHAR   -> JType.CHAR,
+    INT    -> JType.INT,
+    LONG   -> JType.LONG,
+    FLOAT  -> JType.FLOAT,
+    DOUBLE -> JType.DOUBLE
+  )
+  // XXX this was made weak
+  val javaNameMemo: Symbol => String = {
+    implicit val caller = implicitly[Caller] drop 1
+    memoize((sym: Symbol) =>
+      if (sym.isClass || (sym.isModule && !sym.isMethod))
+        sym.fullName('/') + moduleSuffix(sym)
+      else
+        sym.simpleName.toString.trim() + moduleSuffix(sym)
     )
-    primitiveCompanions foreach { sym => 
-      map(sym) = "scala/runtime/" + sym.name + "$"
-    }
+  }
+  // 
+  // private val javaNameCache = {
+  //   val map = new mutable.WeakHashMap[Symbol, String]()
+  //   map ++= List(
+  //     NothingClass        -> RuntimeNothingClass.fullName('/'),
+  //     RuntimeNothingClass -> RuntimeNothingClass.fullName('/'),
+  //     NullClass           -> RuntimeNullClass.fullName('/'),
+  //     RuntimeNullClass    -> RuntimeNullClass.fullName('/')    
+  //   )
+  // }
 
-    map
+  /** Return the a name of this symbol that can be used on the Java
+   *  platform.  It removes spaces from names.
+   *
+   *  Special handling:
+   *    scala.Nothing erases to scala.runtime.Nothing$
+   *       scala.Null erases to scala.runtime.Null$
+   *
+   *  This is needed because they are not real classes, and they mean
+   *  'abrupt termination upon evaluation of that expression' or null respectively.
+   *  This handling is done already in GenICode, but here we need to remove
+   *  references from method signatures to these types, because such classes can
+   *  not exist in the classpath: the type checker will be very confused.
+   */
+  def javaNameLogic(sym: Symbol): String = sym match {
+    case NothingClass | RuntimeNothingClass => "scala/runtime/Nothing$"
+    case NullClass | RuntimeNullClass       => "scala/runtime/Null$"
+    case _                                  =>
+      if (sym.isClassConstructor) "<init>"
+      else if (sym.isTerm && !sym.isModule) sym.simpleName.toString.trim() + moduleSuffix(sym)
+      else if (primitiveCompanions(sym)) "scala/runtime/" + sym.name + "$"
+      else javaNameMemo(sym)
   }
 
   /** This trait may be used by tools who need access to 
@@ -54,7 +97,25 @@ trait GenJVMUtil {
    *  the Eclipse plugin uses it).
    */
   trait BytecodeUtil {
-
+    def javaName(sym: Symbol): String    
+    def javaType(s: Symbol): JType   = javaTypeMemo(s)
+    def javaType(t: Type): JType     = javaType(toTypeKind(t))
+    def javaType(t: TypeKind): JType =
+      if (javaTypeFixed contains t) javaTypeFixed(t)
+      else t match {
+        case REFERENCE(cls)  => new JObjectType(javaName(cls))
+        case ARRAY(elem)     => new JArrayType(javaType(elem))
+      }
+    
+    val javaTypeMemo: Symbol => JType = (sym: Symbol) =>
+      if (sym.isMethod)
+        new JMethodType(
+          if (sym.isClassConstructor) JType.VOID else javaType(sym.tpe.resultType),
+          sym.tpe.paramTypes map javaType toArray
+        )
+      else
+        javaType(sym.tpe)
+    
     val conds = immutable.Map[TestOp, Int](
       EQ -> JExtendedCode.COND_EQ,
       NE -> JExtendedCode.COND_NE,
@@ -71,52 +132,6 @@ trait GenJVMUtil {
       LE -> GT,
       GE -> LT
     )
-
-    /** Return the a name of this symbol that can be used on the Java
-     *  platform.  It removes spaces from names.
-     *
-     *  Special handling:
-     *    scala.Nothing erases to scala.runtime.Nothing$
-     *       scala.Null erases to scala.runtime.Null$
-     *
-     *  This is needed because they are not real classes, and they mean
-     *  'abrupt termination upon evaluation of that expression' or null respectively.
-     *  This handling is done already in GenICode, but here we need to remove
-     *  references from method signatures to these types, because such classes can
-     *  not exist in the classpath: the type checker will be very confused.
-     */
-    def javaName(sym: Symbol): String =      
-      javaNameCache.getOrElseUpdate(sym, {
-        if (sym.isClass || (sym.isModule && !sym.isMethod))
-          sym.fullName('/') + moduleSuffix(sym)
-        else
-          sym.simpleName.toString.trim() + moduleSuffix(sym)
-      })
-
-    def javaType(t: TypeKind): JType = (t: @unchecked) match {
-      case UNIT            => JType.VOID
-      case BOOL            => JType.BOOLEAN
-      case BYTE            => JType.BYTE
-      case SHORT           => JType.SHORT
-      case CHAR            => JType.CHAR
-      case INT             => JType.INT
-      case LONG            => JType.LONG
-      case FLOAT           => JType.FLOAT
-      case DOUBLE          => JType.DOUBLE
-      case REFERENCE(cls)  => new JObjectType(javaName(cls))
-      case ARRAY(elem)     => new JArrayType(javaType(elem))
-    }
-
-    def javaType(t: Type): JType = javaType(toTypeKind(t))
-
-    def javaType(s: Symbol): JType =
-      if (s.isMethod)
-        new JMethodType(
-          if (s.isClassConstructor) JType.VOID else javaType(s.tpe.resultType),
-          s.tpe.paramTypes map javaType toArray
-        )
-      else
-        javaType(s.tpe)
 
     protected def genConstant(jcode: JExtendedCode, const: Constant) {
       const.tag match {

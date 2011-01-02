@@ -104,6 +104,10 @@ class PartestTask extends Task with CompilationPathProperty {
     javacmd = Some(input)
   }
 
+  def setJavaOpts(input: String) {
+    javaOpts = Some(input)
+  }
+
   def setJavacCmd(input: File) {
     javaccmd = Some(input)
   }
@@ -142,6 +146,7 @@ class PartestTask extends Task with CompilationPathProperty {
   private var shootoutFiles: Option[FileSet] = None
   private var scalapFiles: Option[FileSet] = None
   private var errorOnFailed: Boolean = false
+  private var javaOpts: Option[String] = None
   private var scalacOpts: Option[String] = None
   private var timeout: Option[String] = None
   private var jUnitReportDir: Option[File] = None
@@ -216,7 +221,12 @@ class PartestTask extends Task with CompilationPathProperty {
     javacmd foreach (x => antFileManager.JAVACMD = x.getAbsolutePath)
     javaccmd foreach (x => antFileManager.JAVAC_CMD = x.getAbsolutePath)
     scalacOpts foreach (antFileManager.SCALAC_OPTS = _)
+    javaOpts foreach (x => antFileManager.JAVA_OPTS += (" " + x))
     timeout foreach (antFileManager.timeout = _)
+    
+    log("Ant task starting with scalacOpts '%s' and javaOpts '%s'".format(
+      antFileManager.SCALAC_OPTS, antFileManager.JAVA_OPTS)
+    )
     
     type TFSet = (Array[File], String, String)
     val testFileSets = List(

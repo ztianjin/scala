@@ -6,8 +6,6 @@
 **                          |/                                          **
 \*                                                                      */
 
-
-
 package scala
 
 /** <p>
@@ -36,16 +34,14 @@ final class Symbol private (val name: String) extends Serializable {
   private def readResolve(): Any = Symbol.apply(name)
 }
 
-object Symbol extends UniquenessCache[String, Symbol]
-{
+object Symbol extends UniquenessCache[String, Symbol] {
   protected def valueFromKey(name: String): Symbol = new Symbol(name)
   protected def keyFromValue(sym: Symbol): Option[String] = Some(sym.name)
 }
 
 /** This is private so it won't appear in the library API, but
   * abstracted to offer some hope of reusability.  */
-private[scala] abstract class UniquenessCache[K, V >: Null]
-{
+private[scala] abstract class UniquenessCache[K, V >: Null] {
   import java.lang.ref.WeakReference
   import java.util.WeakHashMap
   import java.util.concurrent.locks.ReentrantReadWriteLock

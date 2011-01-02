@@ -535,34 +535,38 @@ trait Definitions extends reflect.generic.StandardDefinitions {
         case result   => result
       }
     }
+    private val getModuleOrClassMemo: Name => Symbol = memoize(getModuleOrClassInternal)
 
     /** If you're looking for a class, pass a type name.
      *  If a module, a term name.
      */
-    private def getModuleOrClass(path: Name): Symbol = {
+    private def getModuleOrClass(path: Name): Symbol =
+      if (isDefinitionsInitialized) getModuleOrClassMemo(path)
+      else getModuleOrClassInternal(path)
+
+    private def getModuleOrClassInternal(path: Name): Symbol = {
       val module   = path.isTermName
       val fullname = path.toTermName
-      if (fullname == nme.NO_NAME)
-        return NoSymbol
+      if (fullname == nme.NO_NAME) NoSymbol else {
+        var sym: Symbol = RootClass
+        var i = 0
+        var j = fullname.pos('.', i)
+        while (j < fullname.length) {
+          sym = sym.info.member(fullname.subName(i, j))
+          i = j + 1
+          j = fullname.pos('.', i)
+        }
+        val result =
+          if (module) sym.info.member(fullname.subName(i, j)).suchThat(_ hasFlag MODULE)
+          else sym.info.member(fullname.subName(i, j).toTypeName)
+        if (result == NoSymbol) {
+          if (settings.debug.value)
+            { log(sym.info); log(sym.info.members) } //debug
+          throw new MissingRequirementError((if (module) "object " else "class ") + fullname)
+        }
 
-      var sym: Symbol = RootClass
-      var i = 0
-      var j = fullname.pos('.', i)
-      while (j < fullname.length) {
-        sym = sym.info.member(fullname.subName(i, j))
-        i = j + 1
-        j = fullname.pos('.', i)
+        result
       }
-      val result =
-        if (module) sym.info.member(fullname.subName(i, j)).suchThat(_ hasFlag MODULE)
-        else sym.info.member(fullname.subName(i, j).toTypeName)
-      if (result == NoSymbol) {
-        if (settings.debug.value)
-          { log(sym.info); log(sym.info.members) }//debug
-        throw new MissingRequirementError((if (module) "object " else "class ") + fullname)
-      }
-
-      result
     }
 
     private def newClass(owner: Symbol, name: TypeName, parents: List[Type]): Symbol = {

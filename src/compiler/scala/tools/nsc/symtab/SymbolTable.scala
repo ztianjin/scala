@@ -6,8 +6,8 @@
 package scala.tools.nsc
 package symtab
 
-import ast.{Trees, TreePrinters, DocComments}
-
+import ast.{ Trees, TreePrinters, DocComments }
+import scala.tools.funnel.Caller
 import util._
 
 abstract class SymbolTable extends reflect.generic.Universe
@@ -32,6 +32,10 @@ abstract class SymbolTable extends reflect.generic.Universe
   def settings: Settings
   def rootLoader: LazyType
   def log(msg: => AnyRef)
+  def memoize[K, V](f: K => V)(implicit caller: Caller): K => V
+  def originize[K, V](f: K => V)(implicit caller: Caller): K => V
+  def originize[T1, T2, V](f: (T1, T2) => V)(implicit caller: Caller): (T1, T2) => V
+
   def abort(msg: String) = throw new Error(msg)
   def abort() = throw new Error()
 
