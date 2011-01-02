@@ -28,9 +28,13 @@ trait LowPriorityCaller {
 
   private val ThisFile  = "Caller.scala"
   private val ThisClass = this.getClass.getName
-  private def isLocal(ste: StackTraceElement) = ste.getFileName == ThisFile || ste.getClassName == ThisClass
+  private def isLocal(ste: StackTraceElement) = (
+    ste.getClassName == "java.lang.Thread" ||
+    ste.getFileName == ThisFile || 
+    ste.getClassName == ThisClass
+  )
 
-  def trace() = (new Throwable).getStackTrace() dropWhile isLocal
+  def trace() = Thread.currentThread.getStackTrace() dropWhile isLocal
   implicit def reifyCallerStack: Caller = new Caller(trace())
 }
 object Caller extends LowPriorityCaller {

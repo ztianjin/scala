@@ -77,6 +77,9 @@ object Funnel {
   class FunnelTimed[K, V](f: K => V, features: FeatureSet, caller: Caller)
               extends Funnel(f, features, caller)
                  with Time[K, V] { }
+                 
+  // def race[K, V](f: K => V, r1: K => V, rs: K => V*)(implicit caller: Caller): Funnel[K, V] =
+  //   create(f, propsAnd(RaceV(r1 :: rs.toList)))(caller)
   
   def memoize[K, V](f: K => V)(implicit caller: Caller): Funnel[K, V] =
     create(f, propsAnd(Memoize))(caller)

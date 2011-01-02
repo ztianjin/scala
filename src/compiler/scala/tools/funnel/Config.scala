@@ -57,6 +57,7 @@ object Config {
   case class LabelV(label: String) extends ValueFeature[String]
   case class SignalV(signal: String) extends ValueFeature[String]
   case class OriginV(origins: Origins) extends ValueFeature[Origins]
+  // case class RaceV(racers: List[Racer]) extends ValueFeature[List[Racer]]
   
   case class FeatureSet(features: Set[Feature]) {
     def +(x: Feature): FeatureSet = FeatureSet(features + x)
@@ -67,6 +68,7 @@ object Config {
     def label   = features collectFirst { case LabelV(label) => label }
     def signal  = features collectFirst { case SignalV(signal) => signal }
     def origins = features collectFirst { case OriginV(origins) => origins }
+    // def racers  = features collectFirst { case RaceV(racers) => racers }
     
     def values: Set[ValueFeature[_]] = features collect { case x: ValueFeature[_] => x }
     def flags: Set[Feature]          = features -- values
