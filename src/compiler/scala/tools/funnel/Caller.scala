@@ -26,13 +26,9 @@ class Caller(val stack: StackSlice) extends JavaStackFrame(stack.head) {
 trait LowPriorityCaller {
   self: Caller.type =>
 
-  private val ThisFile  = "Caller.scala"
   private val ThisClass = this.getClass.getName
-  private def isLocal(ste: StackTraceElement) = (
-    ste.getClassName == "java.lang.Thread" ||
-    ste.getFileName == ThisFile || 
-    ste.getClassName == ThisClass
-  )
+  private def isLocal(ste: StackTraceElement) =
+    Set("java.lang.Thread", ThisClass)(ste.getClassName)
 
   def trace() = Thread.currentThread.getStackTrace() dropWhile isLocal
   implicit def reifyCallerStack: Caller = new Caller(trace())
