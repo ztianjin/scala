@@ -70,6 +70,9 @@ class Funnel[K, V](val f: K => V, features: FeatureSet, caller: Caller) extends 
 
 object Funnel {
   import Config._
+  
+  implicit def function1ToFunnel[K, V](f: K => V)(implicit caller: Caller, features: FeatureSet): Funnel[K, V] =
+    create(f, features)(caller)
 
   private def propsAnd(extras: Feature*): FeatureSet =
     extras.foldLeft(readProps())(_ + _)
