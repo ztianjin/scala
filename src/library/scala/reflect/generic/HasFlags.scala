@@ -91,7 +91,7 @@ trait HasFlags {
   /** The printable representation of this entity's flags and access boundary,
    *  restricted to flags in the given mask.
    */
-  def hasFlagsToString(mask: FlagsType): String
+  def hasFlagsToString(mask: Long): String
 
   /** Access level encoding: there are three scala flags (PRIVATE, PROTECTED,
    *  and LOCAL) which combine with value privateWithin (the "foo" in private[foo])

@@ -101,6 +101,7 @@ trait ScalaSettings extends AbsScalaSettings with StandardScalaSettings {
   val check         = PhasesSetting     ("-Ycheck", "Check the tree at the end of")
   val Yshow         = PhasesSetting     ("-Yshow", "(Requires -Xshow-class or -Xshow-object) Show after")
   val Xcloselim     = BooleanSetting    ("-Yclosure-elim", "Perform closure elimination.")
+  val Yautotrees    = BooleanSetting    ("-Yauto-trees", "Use new tree traverser.")
   val Ycompacttrees = BooleanSetting    ("-Ycompact-trees", "Use compact tree printer when displaying trees.")
   val noCompletion  = BooleanSetting    ("-Yno-completion", "Disable tab-completion in the REPL.")
   val Xdce          = BooleanSetting    ("-Ydead-code", "Perform dead code elimination.")

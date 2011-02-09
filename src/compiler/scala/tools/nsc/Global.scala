@@ -1075,7 +1075,7 @@ class Global(var settings: Settings, var reporter: Reporter) extends SymbolTable
 
   def printAllUnits() {
     print("[[syntax trees at end of " + phase + "]]")
-    atPhase(phase.next) { currentRun.units foreach treePrinter.print }
+    atPhase(phase.next) { currentRun.units foreach printAsAuto }
   }
 
   private def findMemberFromRoot(fullName: Name): Symbol = {    

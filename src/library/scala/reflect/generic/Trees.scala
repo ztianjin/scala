@@ -6,8 +6,10 @@ import Flags._
 
 trait Trees { self: Universe =>
 
-  abstract class AbsTreePrinter(out: PrintWriter) {
-    def print(tree: Tree)
+  trait AbsTreePrinter {
+    protected def out: PrintWriter
+
+    def print(tree: Tree): Unit
     def flush()
   }
 
@@ -29,7 +31,10 @@ trait Trees { self: Universe =>
     type AccessBoundaryType = Name
     type AnnotationType     = Tree
 
-    def hasAccessBoundary = privateWithin != tpnme.EMPTY
+    private val emptyTypeName = mkTypeName(nme.EMPTY)
+
+    def hasAccessBoundary = privateWithin != emptyTypeName
+    def getFlag(mask: Long): Long = flags & mask
     def hasAllFlags(mask: Long): Boolean = (flags & mask) == mask
     def hasFlag(flag: Long) = (flag & flags) != 0L
     def hasFlagsToString(mask: Long): String = flagsToString(

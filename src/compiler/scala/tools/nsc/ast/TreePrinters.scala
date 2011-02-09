@@ -10,11 +10,20 @@ import java.io.{ OutputStream, PrintWriter, StringWriter, Writer }
 import symtab.Flags._
 import symtab.SymbolTable
 
-trait TreePrinters { trees: SymbolTable =>
+trait TreePrinters extends TreePrintingTraversers { 
+  trees: SymbolTable =>
 
   import treeInfo.{ IsTrue, IsFalse }
 
   final val showOuterTests = false
+  
+  trait TreePrinter extends trees.AbsTreePrinter {
+    protected def out: PrintWriter
+
+    def flush(): Unit
+    def print(tree: Tree): Unit
+    def print(unit: CompilationUnit): Unit
+  }
   
   /** Adds backticks if the name is a scala keyword. */
   def quotedName(name: Name, decode: Boolean): String = {
@@ -34,10 +43,10 @@ trait TreePrinters { trees: SymbolTable =>
     case _                  => t.toString
   }
 
-  class TreePrinter(out: PrintWriter) extends trees.AbsTreePrinter(out) {
+  class StdTreePrinter(protected val out: PrintWriter) extends TreePrinter {
     protected var indentMargin = 0
-    protected val indentStep = 2
-    protected var indentString = "                                        " // 40
+    protected val indentStep   = 2
+    protected var indentString = " " * 40
 
     def flush() = out.flush()
 
@@ -446,7 +455,7 @@ trait TreePrinters { trees: SymbolTable =>
   /** A tree printer which is stingier about vertical whitespace and unnecessary
    *  punctuation than the standard one.
    */
-  class CompactTreePrinter(out: PrintWriter) extends TreePrinter(out) {    
+  class CompactTreePrinter(out: PrintWriter) extends StdTreePrinter(out) {    
     override def printRow(ts: List[Tree], start: String, sep: String, end: String) {
       print(start)
       printSeq(ts)(print)(print(sep))
@@ -562,103 +571,25 @@ trait TreePrinters { trees: SymbolTable =>
     }      
   }
   
-  /** This must guarantee not to force any evaluation, so we can learn
-   *  a little bit about trees in the midst of compilation without altering
-   *  the natural course of events.
-   */
-  class SafeTreePrinter(out: PrintWriter) extends TreePrinter(out) {
-    override def print(tree: Tree) {
-      printPosition(tree)
-      printRaw(tree)
-    }
-    private def default(t: Tree) = t.getClass.getName.reverse.takeWhile(_ != '.').reverse
-    private def params(trees: List[Tree]): String = trees map safe mkString ", "
+  object AutoTraverserProducer extends {
+    val global: trees.type = trees
+  } with AutoTraverser {
     
-    private def safe(name: Name): String = name.decode
-    private def safe(tree: Tree): String = tree match {
-      case Apply(fn, args)        => "%s(%s)".format(safe(fn), params(args))
-      case Select(qual, name)     => safe(qual) + "." + safe(name)
-      case This(qual)             => safe(qual) + ".this"
-      case Ident(name)            => safe(name)
-      case Literal(value)         => value.stringValue
-      case _                      => "(?: %s)".format(default(tree))
+    class AutoTraversingPrinter(protected val out: PrintWriter) extends AutoTreeTraverser with TreePrinter {
+      def flush()                  = out.flush()
+      def print(str: String): Unit = out print str
+      def print(tree: Tree): Unit  = out print stringify(tree)
+      def print(unit: CompilationUnit): Unit = {
+        print("\n// Scala source: " + unit.source + "\n")
+        if (unit.body ne null) print(unit.body)
+        else print("<null>")
+
+        println()
+        flush()
+      }
     }
-    
-    override def printRaw(tree: Tree) { print(safe(tree)) }
-  }
-      
-  class TreeMatchTemplate {
-    // non-trees defined in Trees
-    //
-    // case class ImportSelector(name: Name, namePos: Int, rename: Name, renamePos: Int)
-    // case class Modifiers(flags: Long, privateWithin: Name, annotations: List[Tree], positions: Map[Long, Position])
-    //
-    def apply(t: Tree): Unit = t match {
-      // eliminated by typer
-      case Annotated(annot, arg)  =>
-      case AssignOrNamedArg(lhs, rhs) =>
-      case DocDef(comment, definition) =>
-      case Import(expr, selectors) =>
-      
-      // eliminated by refchecks
-      case ModuleDef(mods, name, impl) =>
-      case TypeTreeWithDeferredRefCheck() =>
-      
-      // eliminated by erasure
-      case TypeDef(mods, name, tparams, rhs) =>
-      case Typed(expr, tpt) =>
-      
-      // eliminated by cleanup
-      case ApplyDynamic(qual, args) =>
-      
-      // eliminated by explicitouter
-      case Alternative(trees) =>
-      case Bind(name, body) =>
-      case CaseDef(pat, guard, body) =>
-      case Star(elem) =>
-      case UnApply(fun, args) =>
-      
-      // eliminated by lambdalift
-      case Function(vparams, body) =>
-      
-      // eliminated by uncurry
-      case AppliedTypeTree(tpt, args) =>
-      case CompoundTypeTree(templ) =>
-      case ExistentialTypeTree(tpt, whereClauses) =>
-      case SelectFromTypeTree(qual, selector) =>
-      case SingletonTypeTree(ref) =>
-      case TypeBoundsTree(lo, hi) =>
-      
-      // survivors
-      case Apply(fun, args) =>
-      case ArrayValue(elemtpt, trees) =>
-      case Assign(lhs, rhs) =>
-      case Block(stats, expr) =>
-      case ClassDef(mods, name, tparams, impl) =>
-      case DefDef(mods, name, tparams, vparamss, tpt, rhs)  =>
-      case EmptyTree =>
-      case Ident(name) =>
-      case If(cond, thenp, elsep) =>
-      case LabelDef(name, params, rhs) =>
-      case Literal(value) =>
-      case Match(selector, cases) =>
-      case New(tpt) =>
-      case PackageDef(pid, stats) =>
-      case Return(expr) =>
-      case Select(qualifier, selector) =>
-      case Super(qual, mix) =>
-      case Template(parents, self, body) =>
-      case This(qual) =>
-      case Throw(expr) =>
-      case Try(block, catches, finalizer) =>
-      case TypeApply(fun, args) =>
-      case TypeTree() =>
-      case ValDef(mods, name, tpt, rhs) =>
-      
-      // missing from the Trees comment
-      case Parens(args) =>                          // only used during parsing
-      case SelectFromArray(qual, name, erasure) =>  // only used during erasure
-    }
+    def apply(out: PrintWriter): AutoTraversingPrinter = new AutoTraversingPrinter(out)
+    def apply(): AutoTraversingPrinter                 = apply(new PrintWriter(ConsoleWriter))
   }
   
   private def asStringInternal(t: Tree, f: PrintWriter => TreePrinter): String = {
@@ -668,20 +599,24 @@ trait TreePrinters { trees: SymbolTable =>
     printer.flush()
     buffer.toString
   }    
-  def asString(t: Tree): String = asStringInternal(t, newStandardTreePrinter)
+  def asStandardString(t: Tree): String = asStringInternal(t, newStandardTreePrinter)
   def asCompactString(t: Tree): String = asStringInternal(t, newCompactTreePrinter)
-
-  def newStandardTreePrinter(writer: PrintWriter): TreePrinter = new TreePrinter(writer)
+  def asAutoString(t: Tree): String = asStringInternal(t, newAutoTraversingPrinter)
+  def printAsAuto(unit: CompilationUnit): Unit = AutoTraverserProducer() print unit
+ 
+  def newStandardTreePrinter(writer: PrintWriter): TreePrinter = new StdTreePrinter(writer)
   def newStandardTreePrinter(stream: OutputStream): TreePrinter = newStandardTreePrinter(new PrintWriter(stream))
   def newStandardTreePrinter(): TreePrinter = newStandardTreePrinter(new PrintWriter(ConsoleWriter))
   
-  def newCompactTreePrinter(writer: PrintWriter): CompactTreePrinter = new CompactTreePrinter(writer)
-  def newCompactTreePrinter(stream: OutputStream): CompactTreePrinter = newCompactTreePrinter(new PrintWriter(stream))
-  def newCompactTreePrinter(): CompactTreePrinter = newCompactTreePrinter(new PrintWriter(ConsoleWriter))
+  def newCompactTreePrinter(writer: PrintWriter): TreePrinter = new CompactTreePrinter(writer)
+  def newCompactTreePrinter(): TreePrinter = newCompactTreePrinter(new PrintWriter(ConsoleWriter))
+
+  def newAutoTraversingPrinter(writer: PrintWriter): TreePrinter = AutoTraverserProducer(writer)
   
-  def newTreePrinter(writer: PrintWriter): TreePrinter = 
-    if (settings.Ycompacttrees.value) newCompactTreePrinter(writer)
-    else newStandardTreePrinter(writer)
+  def newTreePrinter(writer: PrintWriter): TreePrinter =
+    newAutoTraversingPrinter(writer)
+    // if (settings.Yautotrees.value) newAutoTraversingPrinter(writer)
+    // else newStandardTreePrinter(writer)
   def newTreePrinter(stream: OutputStream): TreePrinter = newTreePrinter(new PrintWriter(stream))
   def newTreePrinter(): TreePrinter = newTreePrinter(new PrintWriter(ConsoleWriter))
 
