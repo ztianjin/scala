@@ -23,6 +23,18 @@ package scala
 case class Tuple6[+T1, +T2, +T3, +T4, +T5, +T6](_1: T1, _2: T2, _3: T3, _4: T4, _5: T5, _6: T6)
   extends Product6[T1, T2, T3, T4, T5, T6]
 {  
-  override def toString() = "(" + _1 + "," + _2 + "," + _3 + "," + _4 + "," + _5 + "," + _6 + ")"  
   
+  
+  def copyMap[U1, U2, U3, U4, U5, U6](
+    f1: T1 => U1 = Function.identity[T1],
+    f2: T2 => U2 = Function.identity[T2],
+    f3: T3 => U3 = Function.identity[T3],
+    f4: T4 => U4 = Function.identity[T4],
+    f5: T5 => U5 = Function.identity[T5],
+    f6: T6 => U6 = Function.identity[T6]
+  ): Tuple6[U1, U2, U3, U4, U5, U6] = {
+    new Tuple6(f1(_1), f2(_2), f3(_3), f4(_4), f5(_5), f6(_6))
+  }
+    
+  override def toString() = "(" + _1 + "," + _2 + "," + _3 + "," + _4 + "," + _5 + "," + _6 + ")"
 }

@@ -23,7 +23,6 @@ import scala.collection.generic.{ CanBuildFrom => CBF }
 case class Tuple3[+T1, +T2, +T3](_1: T1, _2: T2, _3: T3)
   extends Product3[T1, T2, T3]
 {  
-  override def toString() = "(" + _1 + "," + _2 + "," + _3 + ")"  
   
 
   @deprecated("Use `zipped` instead.")
@@ -142,4 +141,14 @@ case class Tuple3[+T1, +T2, +T3](_1: T1, _2: T2, _3: T3)
     }
   }
 
+  
+  def copyMap[U1, U2, U3](
+    f1: T1 => U1 = Function.identity[T1],
+    f2: T2 => U2 = Function.identity[T2],
+    f3: T3 => U3 = Function.identity[T3]
+  ): Tuple3[U1, U2, U3] = {
+    new Tuple3(f1(_1), f2(_2), f3(_3))
+  }
+    
+  override def toString() = "(" + _1 + "," + _2 + "," + _3 + ")"
 }

@@ -15,7 +15,7 @@
  *  @author  Burak Emir, Stephane Micheloud, Geoffrey Washburn, Paul Phillips
  *  @version 1.1
  */
-object genprod extends Application {
+class genprod {
   val MAX_ARITY = 22
   def arities = (1 to MAX_ARITY).toList
   
@@ -71,23 +71,27 @@ package %s
 %s
 """.trim.format(genprodString, packageDef, imports)
   }
-
-  def args = arguments
-  if (args.length != 1) {
-    println("please give path of output directory")
-    exit(-1)
-  }
-  val out = args(0)
-  def writeFile(node: scala.xml.Node) {
-    import scala.tools.nsc.io._
-    val f = Path(out) / node.attributes("name").toString
-    f.parent.createDirectory(force = true)
-    f.toFile writeAll node.text
-  }
-  
-  allfiles foreach writeFile
 }
+object genprod extends genprod
 import genprod._
+
+object genprodmain {
+  def main(args: Array[String]): Unit = {
+    if (args.length != 1) {
+      println("please give path of output directory")
+      exit(-1)
+    }
+    val out = args(0)
+    def writeFile(node: scala.xml.Node) {
+      import scala.tools.nsc.io._
+      val f = Path(out) / node.attributes("name").toString
+      f.parent.createDirectory(force = true)
+      f.toFile writeAll node.text
+    }
+
+    allfiles foreach writeFile
+  }
+}
 
 
 /* zzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzz
@@ -513,6 +517,23 @@ class Tuple(val i: Int) extends Group("Tuple") with Arity {
     1 to i map (x => " *  @param  _%d   Element %d of this Tuple%d".format(x, x, i))
   ) mkString "\n"
   
+  private def uargs = to map ("U" + _) mkString ", "
+  def copyMap = {
+    """|
+      |  def copyMap[%s](
+      |    %s
+      |  ): Tuple%d[%s] = {
+      |    new Tuple%d(%s)
+      |  }
+    """.stripMargin.format(
+      uargs,
+      1 to i map (x => "f%d: T%d => U%d = Function.identity[T%d]".format(x, x, x, x)) mkString ",\n    ",
+      i, uargs,
+      i,
+      1 to i map (x => "f%d(_%d)".format(x, x)) mkString ", "
+    )
+  }
+  
   // prettifies it a little if it's overlong
   def mkToString() = {
   def str(xs: List[String]) = xs.mkString(""" + "," + """)
@@ -535,8 +556,9 @@ class Tuple(val i: Int) extends Group("Tuple") with Arity {
 case class {className}{covariantArgs}({fields})
   extends {Product.className(i)}{invariantArgs}
 {{  
-  override def toString() = "(" + {mkToString} + ")"  
   {moreMethods}
+  {copyMap}
+  override def toString() = "(" + {mkToString} + ")"
 }}
 </file>}
 } // object Tuple

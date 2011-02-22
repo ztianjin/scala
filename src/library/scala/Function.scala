@@ -27,6 +27,9 @@ object Function {
 
   /** The constant function */
   def const[T, U](x: T)(y: U): T = x
+  
+  /** The identity function for a given type. */
+  def identity[T] : T => T = Predef.identity[T]
 
   /** Turns a function `A => Option[B]` into a `PartialFunction[A, B]`.  Important note:
    *  this transformation implies the original function will be called 2 or more

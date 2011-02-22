@@ -21,6 +21,16 @@ package scala
 case class Tuple4[+T1, +T2, +T3, +T4](_1: T1, _2: T2, _3: T3, _4: T4)
   extends Product4[T1, T2, T3, T4]
 {  
-  override def toString() = "(" + _1 + "," + _2 + "," + _3 + "," + _4 + ")"  
   
+  
+  def copyMap[U1, U2, U3, U4](
+    f1: T1 => U1 = Function.identity[T1],
+    f2: T2 => U2 = Function.identity[T2],
+    f3: T3 => U3 = Function.identity[T3],
+    f4: T4 => U4 = Function.identity[T4]
+  ): Tuple4[U1, U2, U3, U4] = {
+    new Tuple4(f1(_1), f2(_2), f3(_3), f4(_4))
+  }
+    
+  override def toString() = "(" + _1 + "," + _2 + "," + _3 + "," + _4 + ")"
 }

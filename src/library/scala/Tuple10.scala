@@ -27,6 +27,22 @@ package scala
 case class Tuple10[+T1, +T2, +T3, +T4, +T5, +T6, +T7, +T8, +T9, +T10](_1: T1, _2: T2, _3: T3, _4: T4, _5: T5, _6: T6, _7: T7, _8: T8, _9: T9, _10: T10)
   extends Product10[T1, T2, T3, T4, T5, T6, T7, T8, T9, T10]
 {  
-  override def toString() = "(" + _1 + "," + _2 + "," + _3 + "," + _4 + "," + _5 + "," + _6 + "," + _7 + "," + _8 + "," + _9 + "," + _10 + ")"  
   
+  
+  def copyMap[U1, U2, U3, U4, U5, U6, U7, U8, U9, U10](
+    f1: T1 => U1 = Function.identity[T1],
+    f2: T2 => U2 = Function.identity[T2],
+    f3: T3 => U3 = Function.identity[T3],
+    f4: T4 => U4 = Function.identity[T4],
+    f5: T5 => U5 = Function.identity[T5],
+    f6: T6 => U6 = Function.identity[T6],
+    f7: T7 => U7 = Function.identity[T7],
+    f8: T8 => U8 = Function.identity[T8],
+    f9: T9 => U9 = Function.identity[T9],
+    f10: T10 => U10 = Function.identity[T10]
+  ): Tuple10[U1, U2, U3, U4, U5, U6, U7, U8, U9, U10] = {
+    new Tuple10(f1(_1), f2(_2), f3(_3), f4(_4), f5(_5), f6(_6), f7(_7), f8(_8), f9(_9), f10(_10))
+  }
+    
+  override def toString() = "(" + _1 + "," + _2 + "," + _3 + "," + _4 + "," + _5 + "," + _6 + "," + _7 + "," + _8 + "," + _9 + "," + _10 + ")"
 }

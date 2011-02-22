@@ -18,6 +18,13 @@ package scala
 case class Tuple1[@specialized(Int, Long, Double) +T1](_1: T1)
   extends Product1[T1]
 {  
-  override def toString() = "(" + _1 + ")"  
   
+  
+  def copyMap[U1](
+    f1: T1 => U1 = Function.identity[T1]
+  ): Tuple1[U1] = {
+    new Tuple1(f1(_1))
+  }
+    
+  override def toString() = "(" + _1 + ")"
 }
