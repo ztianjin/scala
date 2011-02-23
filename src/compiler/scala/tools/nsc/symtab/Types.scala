@@ -237,6 +237,11 @@ trait Types extends reflect.generic.Types { self: SymbolTable =>
 
   /** The base class for all types */
   abstract class Type extends AbsType {
+    var isDeclaredSingleton: Boolean = false
+    def asDeclaredSingleton: this.type = {
+      isDeclaredSingleton = true
+      this
+    }
     
     /** Types for which asSeenFrom always is the identity, no matter what
      *  prefix or owner.
@@ -1609,12 +1614,17 @@ trait Types extends reflect.generic.Types { self: SymbolTable =>
     assert(underlying.typeSymbol != UnitClass)
     override def isTrivial: Boolean = true
     override def isNotNull = value.value != null
-    override def deconst: Type = underlying
-    override def safeToString: String =
-      underlying.toString + "(" + value.escapedStringValue + ")"
+    override def deconst: Type = 
+      if (isDeclaredSingleton) this
+      else underlying
+    override def safeToString: String = value.escapedStringValue + ".type"
     // override def isNullable: Boolean = value.value eq null
     // override def isNonNull: Boolean = value.value ne null
     override def kind = "ConstantType"
+  }
+  abstract class DeclaredSingletonConstantType(value: Constant) extends ConstantType(value) {
+    override def deconst: Type = this
+    override def kind = "DeclaredSingletonConstantType"
   }
 
   object ConstantType extends ConstantTypeExtractor {

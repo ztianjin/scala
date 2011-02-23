@@ -12,8 +12,7 @@ import PartialFunction._
 /** Traits which are mixed into MatchMatrix, but separated out as
  *  (somewhat) independent components to keep them on the sidelines.
  */
-trait MatrixAdditions extends ast.TreeDSL
-{
+trait MatrixAdditions extends ast.TreeDSL {
   self: ExplicitOuter with ParallelMatching =>
   
   import global.{ typer => _, _ }
@@ -21,7 +20,7 @@ trait MatrixAdditions extends ast.TreeDSL
   import CODE._
   import Debug._
   import treeInfo.{ IsTrue, IsFalse }
-  import definitions.{ isValueClass }
+  import definitions.{ isNumericValueClass }
 
   /** The Squeezer, responsible for all the squeezing.
    */
@@ -168,7 +167,8 @@ trait MatrixAdditions extends ast.TreeDSL
          (sym.isMutable) &&                 // indicates that have not yet checked exhaustivity
         !(sym hasFlag NO_EXHAUSTIVE) &&        // indicates @unchecked
          (sym.tpe.typeSymbol.isSealed) &&
-        !isValueClass(sym.tpe.typeSymbol)   // make sure it's not a primitive, else (5: Byte) match { case 5 => ... } sees no Byte
+         // make sure it's not a primitive, else (5: Byte) match { case 5 => ... } sees no Byte
+        !isNumericValueClass(sym.tpe.typeSymbol)   
       }
 
       private lazy val inexhaustives: List[List[Combo]] = {

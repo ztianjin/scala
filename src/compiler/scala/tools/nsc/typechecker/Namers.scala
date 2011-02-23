@@ -598,6 +598,7 @@ trait Namers { self: Analyzer =>
 //    println("completing self of "+sym.owner+": "+selftpe)
       sym.setInfo(selftpe)
     }
+    private var inferDependentTypes: Boolean = false
 
     /** This method has a big impact on the eventual compiled code.
      *  At this point many values have the most specific possible
@@ -613,7 +614,7 @@ trait Namers { self: Analyzer =>
      *  whether it is otherwise redundant (such as in a singleton.)
      *  Locally defined symbols are also excluded from widening.
      */
-    private def widenIfNecessary(sym: Symbol, tpe: Type, pt: Type): Type = {
+    private def widenIfNecessary(sym: Symbol, tpe: Type, pt: Type, isLiteral: Boolean): Type = {
       val getter = 
         if (sym.isValue && sym.owner.isClass && sym.isPrivate)
           sym.getter(sym.owner) 
@@ -630,8 +631,10 @@ trait Namers { self: Analyzer =>
       }
       val tpe1 = tpe.deconst
       val tpe2 = tpe1.widen
-      if ((sym.isVariable || sym.isMethod && !sym.hasAccessorFlag))
+
+      if (sym.isVariable || sym.isMethod && !sym.hasAccessorFlag)
         if (tpe2 <:< pt) tpe2 else tpe1
+      else if (isLiteral && inferDependentTypes) tpe
       else if (isHidden(tpe)) tpe2
       else if (sym.isFinal || sym.isLocal) tpe
       else tpe1
@@ -941,7 +944,7 @@ trait Namers { self: Analyzer =>
           // replace deSkolemized symbols with skolemized ones (for resultPt computed by looking at overridden symbol, right?)
           val pt = resultPt.substSym(tparamSyms, tparams map (_.symbol))
           // compute result type from rhs
-          tpt defineType widenIfNecessary(meth, typer.computeType(rhs, pt), pt)
+          tpt defineType widenIfNecessary(meth, typer.computeType(rhs, pt), pt, rhs.isInstanceOf[Literal])
           tpt setPos meth.pos.focus
           tpt.tpe
         } else typer.typedType(tpt).tpe
@@ -1194,7 +1197,8 @@ trait Namers { self: Analyzer =>
                   tpt defineType widenIfNecessary(
                     sym, 
                     newTyper(typer1.context.make(vdef, sym)).computeType(rhs, WildcardType), 
-                    WildcardType)
+                    WildcardType,
+                    rhs.isInstanceOf[Literal])
                   tpt setPos vdef.pos.focus
                   tpt.tpe 
                 }

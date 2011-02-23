@@ -7,7 +7,7 @@ Changes: Map(trait A -> List(Changed(Definition(A.x))[method x changed from ()T 
 invalidate B.scala because inherited method changed [Changed(Definition(A.x))[method x changed from ()T to ()T flags: <deferred> <method>]]
 compiling Set(B.scala)
 B.scala:2: error: type mismatch;
- found   : Int(3)
+ found   : 3.type (with underlying type Int)
  required: String
   def x = 3
           ^

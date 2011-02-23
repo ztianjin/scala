@@ -577,6 +577,7 @@ trait Infer {
             if      (targ.typeSymbol == RepeatedParamClass)     targ.baseType(SeqClass)
             else if (targ.typeSymbol == JavaRepeatedParamClass) targ.baseType(ArrayClass)
             else if (targ.typeSymbol.isModuleClass) targ  // this infers Foo.type instead of "object Foo"
+            else if (targ.isDeclaredSingleton) targ
             else targ.widen
           )
         }
@@ -604,11 +605,11 @@ trait Infer {
                      argtpes: List[Type], pt: Type): AdjustedTypeArgs.Result = {
       val tvars = tparams map freshVar
       if (inferInfo) 
-        println("methTypeArgs tparams = "+tparams+
-                ", formals = "+formals+
-                ", restpe = "+restpe+
-                ", argtpes = "+argtpes+
-                ", pt = "+pt+
+        println("methTypeArgs tparams = "+tparams+"\n"+
+                ", formals = "+formals+"\n"+
+                ", restpe = "+restpe+"\n"+
+                ", argtpes = "+argtpes+"\n"+
+                ", pt = "+pt+"\n"+
                 ", tvars = "+tvars+" "+(tvars map (_.constr)))
       if (!sameLength(formals, argtpes)) {
         throw new NoInstance("parameter lists differ in length")
@@ -638,9 +639,9 @@ trait Infer {
         if (!isFullyDefined(tvar)) tvar.constr.inst = NoType
  
       // Then define remaining type variables from argument types.
-      (argtpes, formals).zipped map { (argtpe, formal) =>
+      (argtpes, formals).zipped map { (argtpe, formal) =>        
         //@M isCompatible has side-effect: isSubtype0 will register subtype checks in the tvar's bounds
-        if (!isCompatible(argtpe.deconst.instantiateTypeParams(tparams, tvars), 
+        if (!isCompatible(argtpe.deconst.instantiateTypeParams(tparams, tvars),
                              formal.instantiateTypeParams(tparams, tvars))) {
           throw new DeferredNoInstance(() =>
             "argument expression's type is not compatible with formal parameter type" +
@@ -1154,6 +1155,8 @@ trait Infer {
           println("infer method instance "+fn+"\n"+
                   "  undetparams = "+undetparams+"\n"+
                   "  args = "+args+"\n"+
+                  "  argtpes = " + (args map (_.tpe)) + 
+                  "  argtpedeconsts = " + (args map (_.tpe.deconst)) + 
                   "  pt = "+pt0)
         try {
           val pt = if (pt0.typeSymbol == UnitClass) WildcardType else pt0
@@ -1165,7 +1168,7 @@ trait Infer {
           val treeSubst = new TreeTypeSubstituter(okparams, okargs)
           treeSubst.traverse(fn)
           treeSubst.traverseTrees(args)
-          if(leftUndet nonEmpty) {  // #3890
+          if (leftUndet nonEmpty) {  // #3890
             val leftUndet1 = treeSubst.typeSubst mapOver leftUndet
             if(leftUndet ne leftUndet1) {
               val symSubst = new TreeSymSubstTraverser(leftUndet, leftUndet1)
@@ -1317,6 +1320,8 @@ trait Infer {
         tp match {
           case SingleType(pre, _) => 
             check(pre, bound)
+          case ConstantType(_) =>
+            ;
           case TypeRef(pre, sym, args) => 
             if (sym.isAbstractType) {
               if (!isLocalBinding(sym)) patternWarning(tp, "abstract type ")

@@ -7,7 +7,7 @@ Changes: Map(class A -> List(Changed(Definition(A.y))[method y changed from (i: 
 invalidate B.scala because inherited method changed [Changed(Definition(A.y))[method y changed from (i: Int)java.lang.String to (i: Int)java.lang.String flags: implicit <method>]]
 compiling Set(B.scala)
 B.scala:2: error: type mismatch;
- found   : Int(3)
+ found   : 3.type (with underlying type Int)
  required: String
   val x: String = 3
                   ^

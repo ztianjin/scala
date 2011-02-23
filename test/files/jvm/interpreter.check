@@ -20,7 +20,7 @@ scala> defined type alias anotherint
 scala> four: anotherint = 4
 
 scala> <console>:8: error: type mismatch;
- found   : java.lang.String("hello")
+ found   : "hello".type (with underlying type java.lang.String)
  required: anotherint
        val bogus: anotherint = "hello"
                                ^

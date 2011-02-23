@@ -3044,9 +3044,18 @@ trait Typers extends Modes {
       def typedAssign(lhs: Tree, rhs: Tree): Tree = {
         val lhs1    = typed(lhs, EXPRmode | LHSmode, WildcardType)
         val varsym  = lhs1.symbol
-        def failMsg =
+        def failMsg = {
           if (varsym != null && varsym.isValue) "reassignment to val"
           else "assignment to non variable"
+        }
+        
+        // def failMsg = {
+        //   val msg = 
+        //     if (varsym != null && varsym.isValue) "reassignment to val"
+        //     else "assignment to non variable"
+        //   
+        //   msg + ": " + lhs + " = " + rhs
+        // }
         
         def fail = {    
           if (!lhs1.tpe.isError)
@@ -4068,10 +4077,15 @@ trait Typers extends Modes {
             if (value.tag == UnitTag) UnitClass.tpe
             else ConstantType(value))
 
-        case SingletonTypeTree(ref) =>
+        case stt @ SingletonTypeTree(ref) =>
+          val pt = if (stt.isLiteral) AnyClass.tpe else AnyRefClass.tpe
           val ref1 = checkStable(
-            typed(ref, EXPRmode | QUALmode | (mode & TYPEPATmode), AnyRefClass.tpe))
-          tree setType ref1.tpe.resultType
+            typed(ref, EXPRmode | QUALmode | (mode & TYPEPATmode), pt))
+          
+          tree setType (
+            if (stt.isLiteral) ref1.tpe.resultType.asDeclaredSingleton
+            else ref1.tpe.resultType
+          )          
 
         case SelectFromTypeTree(qual, selector) =>
           val qual1 = typedType(qual, mode)

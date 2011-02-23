@@ -594,8 +594,9 @@ trait Trees { self: Universe =>
   case class Annotated(annot: Tree, arg: Tree) extends Tree 
 
   /** Singleton type, eliminated by RefCheck */
-  case class SingletonTypeTree(ref: Tree)
-        extends TypTree
+  case class SingletonTypeTree(ref: Tree) extends TypTree {
+    def isLiteral = false
+  }
 
   /** Type selection <qualifier> # <name>, eliminated by RefCheck */
   case class SelectFromTypeTree(qualifier: Tree, name: TypeName)
