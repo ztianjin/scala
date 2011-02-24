@@ -6,7 +6,7 @@ object Test extends App {
 
     // ticket #153
     def powers(x: Int) = if ((x&(x-1)) == 0) Some(x) else None
-    println(s3.flatMap(powers).reverse)
+    println(s3.flatMap(powers).reverse.force)
   }
 
   foo

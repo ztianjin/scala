@@ -121,8 +121,8 @@ x = Stack(c, b, a)
 y = Stack(c, b, a)
 x equals y: true, y equals x: true
 
-x = Stream(0, ?)
-y = Stream(0, ?)
+x = Stream(?, ?)
+y = Stream(?, ?)
 x equals y: true, y equals x: true
 
 x = Map(42 -> FortyTwo)

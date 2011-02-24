@@ -4,8 +4,9 @@ object Test {
   
   def main(args: Array[String]): Unit = {
     // Stream is strict in its head so we should see 1 from each of them.
-    val s1 = mkIterator.toStream
-    val s2 = mkInfinite.toStream
+    // ha ha
+    val s1 = mkIterator.toStream.head
+    val s2 = mkInfinite.toStream.head
     // back and forth without slipping into nontermination.
     println((Stream from 1).toIterator.drop(10).toStream.drop(10).toIterator.next)
     ()

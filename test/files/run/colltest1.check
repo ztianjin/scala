@@ -9,10 +9,10 @@ new test starting with List()
 1
 List(1, 2, 3, 4, 5, 6, 7, 8, 9, 10)
 new test starting with Stream()
-10: Stream(1, 2, 3, 4, 5, 6, 7, 8, 9, 10)
-9: Stream(2, 3, 4, 5, 6, 7, 8, 9, 10)
+10: Stream(?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+9: Stream(?, ?, ?, ?, ?, ?, ?, ?, ?)
 1
-Stream(1, ?)
+Stream(?, ?)
 new test starting with WrappedArray()
 10: ArrayBuffer(1, 2, 3, 4, 5, 6, 7, 8, 9, 10)
 9: ArrayBuffer(2, 3, 4, 5, 6, 7, 8, 9, 10)

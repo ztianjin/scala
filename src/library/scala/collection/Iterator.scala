@@ -1008,7 +1008,10 @@ trait Iterator[+A] extends TraversableOnce[A] {
   def toTraversable: Traversable[A] = toStream  
   def toIterator: Iterator[A] = self
   def toStream: Stream[A] =
-    if (self.hasNext) Stream.cons(self.next, self.toStream)
+    if (self.hasNext) {
+      val elem = self.next
+      Stream.cons(elem, self.toStream)
+    }
     else Stream.empty[A]
 
   /** Converts this iterator to a string.  

@@ -2,8 +2,8 @@ Stream()
 Stream()
 
 Array(1)
-Stream(1, ?)
-Stream(1, ?)
+Stream(?, ?)
+Stream(?, ?)
 Stream()
 Stream()
 Stream(1)
@@ -18,8 +18,8 @@ Stream()
 999
 512
 100000
-Stream(100001, ?)
-Stream(100001, ?)
+Stream(?, ?)
+Stream(?, ?)
 true
 true
 705082704
