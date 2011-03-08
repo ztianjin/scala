@@ -373,19 +373,30 @@ abstract class CleanUp extends Transform with ast.TreeDSL {
           /** Normal non-Array call */
           def genDefaultCall = {
             // reflective method call machinery
+            def nameOfMethod = ad.symbol.name.toString
             val invokeName  = MethodClass.tpe member nme.invoke_                                // reflect.Method.invoke(...)
-            def cache       = REF(reflectiveMethodCache(ad.symbol.name.toString, paramTypes))   // cache Symbol
+            def cache       = REF(reflectiveMethodCache(nameOfMethod, paramTypes))   // cache Symbol
             def lookup      = Apply(cache, List(qual GETCLASS))                                 // get Method object from cache
             def invokeArgs  = ArrayValue(TypeTree(ObjectClass.tpe), params)                     // args for invocation
             def invocation  = (lookup DOT invokeName)(qual, invokeArgs)                         // .invoke(qual, ...)
             
-            // exception catching machinery
-            val invokeExc   = currentOwner.newValue(ad.pos, mkTerm("")) setInfo InvocationTargetExceptionClass.tpe
-            def catchVar    = Bind(invokeExc, Typed(Ident(nme.WILDCARD), TypeTree(InvocationTargetExceptionClass.tpe)))
-            def catchBody   = Throw(Apply(Select(Ident(invokeExc), nme.getCause), Nil))
-          
-            // try { method.invoke } catch { case e: InvocationTargetExceptionClass => throw e.getCause() }
-            fixResult(TRY (invocation) CATCH { CASE (catchVar) ==> catchBody } ENDTRY)
+            // unwrapping InvocationTargetException to deliver the real one
+            val invocationExSym = currentOwner.newValue(ad.pos, mkTerm("")) setInfo InvocationTargetExceptionClass.tpe
+            def invocationEx    = Bind(invocationExSym, Typed(Ident(nme.WILDCARD), TypeTree(InvocationTargetExceptionClass.tpe)))
+            def unwrapEx        = Throw(Apply(Select(Ident(invocationExSym), nme.getCause), Nil))
+            
+            // catching NoSuchMethod and doing brute force reflective search
+            val noSuchMethod    = Typed(Ident(nme.WILDCARD), TypeTree(NoSuchMethodClass.tpe))
+            def tryBestMethod   = {
+              val bestMatchMethod = REF(getMember(getModule("scala.runtime.MethodCache"), "bestMatch"))
+              val m = Apply(bestMatchMethod, List(qual, LIT(nameOfMethod)))
+              (m DOT invokeName)(qual, invokeArgs)              
+            }
+
+            fixResult(TRY (invocation) CATCH(
+              CASE(noSuchMethod) ==> tryBestMethod ,
+              CASE(invocationEx) ==> unwrapEx
+            ) ENDTRY)
           }
           
           /** A possible primitive method call, represented by methods in BoxesRunTime. */

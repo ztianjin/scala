@@ -32,6 +32,23 @@ sealed abstract class MethodCache {
   def add(forReceiver: JClass[_], forMethod: JMethod): MethodCache
 }
 
+object MethodCache {
+  // Real signature would be more like this:
+  // def bestMatch(target: AnyRef, name: String, args: Seq[Class[_]]): JMethod 
+  //
+  // Here is where the fallback logic could be placed: multimethod
+  // dispatch based on what can be gleaned at runtime.  But for now it
+  // just assumes there will be only one right method to invoke, and
+  // that the arguments will need no adaptation.
+  def bestMatch(target: AnyRef, name: String): JMethod = {
+    if (sys.props contains "scalac.reflect.debug")
+      println("bestMatch(%s, %s)".format(target, name))
+
+    val ms = target.getClass.getMethods filter (_.getName == name) sortBy (_.isBridge)
+    ms.head
+  }
+}
+
 final class EmptyMethodCache extends MethodCache {
 
   def find(forReceiver: JClass[_]): JMethod = null

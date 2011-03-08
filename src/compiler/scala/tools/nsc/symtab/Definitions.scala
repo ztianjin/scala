@@ -194,6 +194,7 @@ trait Definitions extends reflect.generic.StandardDefinitions {
     lazy val NullPointerExceptionClass      = getClass(sn.NPException)
     lazy val ThrowableClass                 = getClass(sn.Throwable)
     lazy val UninitializedErrorClass        = getClass("scala.UninitializedFieldError")
+    lazy val NoSuchMethodClass              = getClass("java.lang.NoSuchMethodException")
     
     // annotations
     lazy val AnnotationClass            = getClass("scala.annotation.Annotation")
