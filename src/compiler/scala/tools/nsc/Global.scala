@@ -255,9 +255,9 @@ class Global(var settings: Settings, var reporter: Reporter) extends SymbolTable
     def profileClass = settings.YprofileClass.value
     def profileMem   = settings.YprofileMem.value
 
-    // XXX: short term, but I can't bear to add another option.
-    // scalac -Dscala.timings will make this true.
-    def timings       = sys.props contains "scala.timings"
+    // shortish-term property based options
+    def timings       = sys.props contains "scalac.timing"
+    def inferDebug    = sys.props contains "scalac.infer.info"
   }
 
   // True if -Xscript has been set, indicating a script run.
@@ -335,6 +335,7 @@ class Global(var settings: Settings, var reporter: Reporter) extends SymbolTable
 
   /** Switch to turn on detailed type logs */
   var printTypings = opt.typerDebug
+  var printTypeInference = opt.typerDebug || opt.inferDebug
 
   // phaseName = "parser"
   object syntaxAnalyzer extends {

@@ -1891,8 +1891,15 @@ A type's typeSymbol should never be inspected directly.
           case TypeRef(_, RepeatedParamClass, arg :: _) => return arg + "*"
           case TypeRef(_, ByNameParamClass, arg :: _)   => return "=> " + arg
           case _ =>
-            if (isFunctionType(this))
-              return normalize.typeArgs.init.mkString("(", ", ", ")") + " => " + normalize.typeArgs.last
+            if (isFunctionType(this)) {
+              val targs = normalize.typeArgs
+              val paramlist = targs.init match {
+                case Nil      => "()"
+                case x :: Nil => "" + x
+                case xs       => xs.mkString("(", ", ", ")")
+              }
+              return paramlist + " => " + targs.last
+            }
             else if (isTupleTypeOrSubtype(this)) 
               return normalize.typeArgs.mkString("(", ", ", if (hasLength(normalize.typeArgs, 1)) ",)" else ")")
             else if (sym.isAliasType && prefixChain.exists(_.termSymbol.isSynthetic)) {
@@ -2252,10 +2259,12 @@ A type's typeSymbol should never be inspected directly.
 
   //@M 
   // a TypeVar used to be a case class with only an origin and a constr
-  // then, constr became mutable (to support UndoLog, I guess), but pattern-matching returned the original constr0 (a bug)
+  // then, constr became mutable (to support UndoLog, I guess),
+  // but pattern-matching returned the original constr0 (a bug)
   // now, pattern-matching returns the most recent constr
   object TypeVar {
-    // encapsulate suspension so we can automatically link the suspension of cloned typevars to their original if this turns out to be necessary
+    // encapsulate suspension so we can automatically link the suspension of cloned
+    // typevars to their original if this turns out to be necessary
     def Suspension = new Suspension
     class Suspension {
       private val suspended = mutable.HashSet[TypeVar]()
@@ -2264,17 +2273,20 @@ A type's typeSymbol should never be inspected directly.
         suspended += tv
       }
       def resumeAll: Unit = {
-        for(tv <- suspended) {
+        for (tv <- suspended) {
           tv.suspended = false
         }
-        suspended.clear
+        suspended.clear()
       }
     }
 
     def unapply(tv: TypeVar): Some[(Type, TypeConstraint)] = Some((tv.origin, tv.constr))
     def apply(origin: Type, constr: TypeConstraint) = new TypeVar(origin, constr, List(), List())
-    def apply(tparam: Symbol) = new TypeVar(tparam.tpeHK, new TypeConstraint, List(), tparam.typeParams) // TODO why not initialise TypeConstraint with bounds of tparam?
-    def apply(origin: Type, constr: TypeConstraint, args: List[Type], params: List[Symbol]) = new TypeVar(origin, constr, args, params)
+    // TODO why not initialise TypeConstraint with bounds of tparam?
+    // @PP: I tried that, didn't work out so well for me.
+    def apply(tparam: Symbol) = new TypeVar(tparam.tpeHK, new TypeConstraint, List(), tparam.typeParams) 
+    def apply(origin: Type, constr: TypeConstraint, args: List[Type], params: List[Symbol]) =
+      new TypeVar(origin, constr, args, params)
   }
   
   /** A class representing a type variable 
@@ -2409,7 +2421,8 @@ A type's typeSymbol should never be inspected directly.
       }
     }
 
-    def registerTypeEquality(tp: Type, typeVarLHS: Boolean): Boolean = { //println("regTypeEq: "+(safeToString, debugString(tp), typeVarLHS)) //@MDEBUG
+    def registerTypeEquality(tp: Type, typeVarLHS: Boolean): Boolean = {
+      //println("regTypeEq: "+(safeToString, debugString(tp), typeVarLHS)) //@MDEBUG
       def checkIsSameType(tp: Type) = 
         if(typeVarLHS) constr.inst =:= tp
         else           tp          =:= constr.inst
@@ -2573,8 +2586,7 @@ A type's typeSymbol should never be inspected directly.
 
 // Creators ---------------------------------------------------------------
 
-  /** Rebind symbol `sym' to an overriding member in type
-   *  `pre'.
+  /** Rebind symbol `sym' to an overriding member in type `pre'.
    */
   private def rebind(pre: Type, sym: Symbol): Symbol = {
     val owner = sym.owner
@@ -2617,7 +2629,7 @@ A type's typeSymbol should never be inspected directly.
   }
 
   /** the canonical creator for a refined type with a given scope */
-  def refinedType(parents: List[Type], owner: Symbol, decls: Scope, pos : Position): Type = {
+  def refinedType(parents: List[Type], owner: Symbol, decls: Scope, pos: Position): Type = {
     if (phase.erasedTypes)
       if (parents.isEmpty) ObjectClass.tpe else parents.head
     else { 

@@ -1134,7 +1134,7 @@ abstract class RefChecks extends InfoTransform {
           val clazz = pat.tpe.typeSymbol;
           clazz == seltpe.typeSymbol &&
           clazz.isCaseClass &&
-          (args corresponds clazz.primaryConstructor.tpe.asSeenFrom(seltpe, clazz).paramTypes)(isIrrefutable) // @PP: corresponds
+          (args corresponds clazz.primaryConstructor.tpe.asSeenFrom(seltpe, clazz).paramTypes)(isIrrefutable) 
         case Typed(pat, tpt) => 
           seltpe <:< tpt.tpe
         case Ident(tpnme.WILDCARD) =>
@@ -1150,14 +1150,14 @@ abstract class RefChecks extends InfoTransform {
     /** If symbol is deprecated and is not contained in a deprecated definition,
      *  issue a deprecated warning
      */
-    private def checkDeprecated(sym: Symbol, pos: Position) {
+    private def checkDeprecated(sym: Symbol, pos: Position) {      
       if (sym.isDeprecated && !currentOwner.ownerChain.exists(_.isDeprecated)) {
-        val dmsg = sym.deprecationMessage
-        val msg = sym.toString + sym.locationString +" is deprecated"+
-                  (if (dmsg.isDefined) ": "+ dmsg.get else "")
-        unit.deprecationWarning(pos, msg)
+        unit.deprecationWarning(pos, "%s%s is deprecated%s".format(
+          sym, sym.locationString, sym.deprecationMessage map (": " + _) getOrElse "")
+        )
       }
     }
+
     /** Similar to deprecation: check if the symbol is marked with @migration
      *  indicating it has changed semantics between versions.
      */
@@ -1236,7 +1236,7 @@ abstract class RefChecks extends InfoTransform {
     private def transformCaseApply(tree: Tree, ifNot: => Unit) = {
       val sym = tree.symbol
       
-      if (sym.isSourceMethod && sym.hasFlag(CASE) && sym.name == nme.apply)
+      if (sym.isSourceMethod && sym.isCase && sym.name == nme.apply)
         toConstructor(tree.pos, tree.tpe)
       else {
         ifNot

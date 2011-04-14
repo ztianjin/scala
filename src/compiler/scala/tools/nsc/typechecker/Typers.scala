@@ -80,6 +80,7 @@ trait Typers extends Modes {
 
   abstract class Typer(context0: Context) extends TyperDiagnostics {
     import context0.unit
+    import typeDebug.{ ptTree, ptBlock, ptLine }
 
     val infer = new Inferencer(context0) {
       override def isCoercible(tp: Type, pt: Type): Boolean = undoLog undo { // #3281
@@ -728,7 +729,7 @@ trait Typers extends Modes {
         val tree1 = if (tree.isType) tree 
                     else TypeApply(tree, tparams1 map (tparam => 
                       TypeTree(tparam.tpeHK) setPos tree.pos.focus)) setPos tree.pos //@M/tcpolyinfer: changed tparam.tpe to tparam.tpeHK
-        context.undetparams = context.undetparams ::: tparams1
+        context.undetparams ++= tparams1
         adapt(tree1 setType restpe.substSym(tparams, tparams1), mode, pt, original)
       case mt: MethodType if mt.isImplicit && ((mode & (EXPRmode | FUNmode | LHSmode)) == EXPRmode) => // (4.1)
         if (context.undetparams nonEmpty) {  // (9) -- should revisit dropped condition `(mode & POLYmode) == 0`
@@ -2230,7 +2231,7 @@ trait Typers extends Modes {
           // now fixed by using isWeaklyCompatible in exprTypeArgs
           // TODO: understand why exactly -- some types were not inferred anymore (`ant clean quick.bin` failed)
           // (I had expected inferMethodAlternative to pick up the slack introduced by using WildcardType here)
-          isApplicableSafe(context.undetparams, followApply(pre.memberType(alt)), argtypes, pt) 
+          isApplicableSafe(context.undetparams, followApply(pre.memberType(alt)), argtypes, pt)
         }
         if (sym.isOverloaded) {
           val sym1 = sym filter (alt => {
@@ -2945,16 +2946,17 @@ trait Typers extends Modes {
         errorTree(tree, treeSymTypeMsg(fun)+" does not take type parameters.")
     }
 
-    @inline final def deindentTyping() = if (printTypings) context.typingIndent = context.typingIndent.substring(0, context.typingIndent.length() - 2)
-    @inline final def indentTyping() = if (printTypings) context.typingIndent += "  "
-    @inline final def printTyping(s: => String) = if (printTypings) println(context.typingIndent+s)
+    @inline final def deindentTyping() = context.typingIndentLevel -= 2
+    @inline final def indentTyping() = context.typingIndentLevel += 2
+    @inline final def printTyping(s: => String) = {
+      if (printTypings)
+        println(context.typingIndent + s.replaceAll("\n", "\n" + context.typingIndent))
+    }
+    @inline final def printInference(s: => String) = {
+      if (printTypeInference)
+        println(s)
+    }
 
-    /**
-     *  @param tree ...
-     *  @param mode ...
-     *  @param pt   ...
-     *  @return     ...
-     */
     protected def typed1(tree: Tree, mode: Int, pt: Type): Tree = {
       def isPatternMode = inPatternMode(mode)
       
@@ -3262,9 +3264,13 @@ trait Typers extends Modes {
               case _                                  => Nil
             })
             def errorInResult(tree: Tree) = treesInResult(tree) exists (_.pos == ex.pos)
-            
-            if (fun :: tree :: args exists errorInResult) {
-              printTyping("second try for: "+fun+" and "+args)
+            val retry = fun :: tree :: args exists errorInResult
+            printTyping({
+              val funStr = "%s and %s".format(ptTree(fun), args map ptTree mkString ", ")
+              if (retry) "second try: " + funStr
+              else "no second try: " + funStr + " because error not in result: " + ex.pos+"!="+tree.pos
+            })
+            if (retry) {
               val Select(qual, name) = fun
               val args1 = tryTypedArgs(args, forArgMode(fun, mode), ex)
               val qual1 =
@@ -3274,8 +3280,7 @@ trait Typers extends Modes {
                 val tree1 = Apply(Select(qual1, name) setPos fun.pos, args1) setPos tree.pos
                 return typed1(tree1, mode | SNDTRYmode, pt)
               }
-            } else printTyping("no second try for "+fun+" and "+args+" because error not in result:"+ex.pos+"!="+tree.pos)
-
+            }
             reportTypeError(tree.pos, ex)
             setError(tree)
         }
@@ -4149,7 +4154,9 @@ trait Typers extends Modes {
      *  @param pt   ...
      *  @return     ...
      */
-     def typed(tree: Tree, mode: Int, pt: Type): Tree = { indentTyping()
+    def typed(tree: Tree, mode: Int, pt: Type): Tree = {
+      indentTyping()
+
       def dropExistential(tp: Type): Type = tp match {
         case ExistentialType(tparams, tpe) => 
           if (settings.debug.value)
@@ -4162,6 +4169,7 @@ trait Typers extends Modes {
         case _ => tp
       }
 
+      var alreadyTyped = false
       try {
         if (Statistics.enabled) {
           val t = currentTime()
@@ -4176,15 +4184,35 @@ trait Typers extends Modes {
           tree.tpe = null
           if (tree.hasSymbol) tree.symbol = NoSymbol
         }
-        printTyping("typing "+tree+", pt = "+pt+", undetparams = "+context.undetparams+", implicits-enabled = "+context.implicitsEnabled+", silent = "+context.reportGeneralErrors+", context.owner = "+context.owner) //DEBUG
+        
+        alreadyTyped = tree.tpe ne null
+        var tree1: Tree = if (alreadyTyped) tree else {
+          printTyping(
+            ptLine("typing %s: pt = %s".format(ptTree(tree), pt),
+              "undetparams"      -> context.undetparams,
+              "implicitsEnabled" -> context.implicitsEnabled,
+              "silent"           -> !context.reportGeneralErrors,
+              "context.owner"    -> context.owner
+            )
+          )
+          val tree1 = typed1(tree, mode, dropExistential(pt))
 
-        var tree1 = if (tree.tpe ne null) tree else typed1(tree, mode, dropExistential(pt))
-        printTyping("typed "+tree1+":"+tree1.tpe+(if (isSingleType(tree1.tpe)) " with underlying "+tree1.tpe.widen else "")+", undetparams = "+context.undetparams+", pt = "+pt) //DEBUG
+          printTyping("typed %s: %s%s".format(
+            ptTree(tree1), tree1.tpe, 
+            if (isSingleType(tree1.tpe)) " with underlying "+tree1.tpe.widen else "")
+          )
+          tree1
+        }
        
         tree1.tpe = addAnnotations(tree1, tree1.tpe)
-
         val result = if (tree1.isEmpty) tree1 else adapt(tree1, mode, pt, tree)
-        printTyping("adapted "+tree1+":"+tree1.tpe.widen+" to "+pt+", "+context.undetparams) //DEBUG
+        
+        if (!alreadyTyped) {
+          printTyping("adapted %s: %s to %s, %s".format(
+            tree1, tree1.tpe.widen, pt, context.undetparamsString)
+          ) //DEBUG
+        }
+
 //      for (t <- tree1.tpe) assert(t != WildcardType)
 //      if ((mode & TYPEmode) != 0) println("type: "+tree1+" has type "+tree1.tpe)
         if (phase.id <= currentRun.typerPhase.id) signalDone(context.asInstanceOf[analyzer.Context], tree, result)
@@ -4192,7 +4220,7 @@ trait Typers extends Modes {
       } catch {
         case ex: TypeError =>
           tree.tpe = null
-          printTyping("caught "+ex+" in typed: "+tree) //DEBUG
+          printTyping("caught %s: while typing %s".format(ex, tree)) //DEBUG
           reportTypeError(tree.pos, ex)
           setError(tree)
         case ex: Exception =>
@@ -4205,6 +4233,7 @@ trait Typers extends Modes {
       }
       finally {
         deindentTyping()
+          
         if (Statistics.enabled) {
           val t = currentTime()
           microsByType(pendingTreeTypes.head) += ((t - typerTime) / 1000).toInt

@@ -12,7 +12,33 @@ trait TypeDebugging {
   import definitions._
 
   // @M toString that is safe during debugging (does not normalize, ...)
-  object TypeDebugStrings {
+  object typeDebug {  
+    private def to_s(x: Any): String = x match {
+      // otherwise case classes are caught looking like products
+      case _: Tree | _: Type     => "" + x
+      case x: TraversableOnce[_] => x mkString ", "
+      case x: Product            => x.productIterator mkString ("(", ", ", ")")
+      case _                     => "" + x
+    }
+    def ptIndent(x: Any) = ("" + x).replaceAll("\\n", "  ")
+    def ptBlock(label: String, pairs: (String, Any)*): String = {
+      val width = pairs map (_._1.length) max
+      val fmt   = "%-" + (width + 1) + "s %s"
+      val strs  = pairs map { case (k, v) => fmt.format(k, to_s(v)) }
+  
+      strs.mkString(label + " {\n  ", "\n  ", "\n}")
+    }
+    def ptLine(label: String, pairs: (String, Any)*): String = {
+      val strs = pairs map { case (k, v) => k + "=" + to_s(v) }
+      strs.mkString(label + ": ", ", ", "")      
+    }
+    def ptTree(t: Tree) = t match {
+      case PackageDef(pid, _)            => "package " + pid
+      case ModuleDef(_, name, _)         => "object " + name
+      case ClassDef(_, name, tparams, _) => "class " + name + str.brackets(tparams)
+      case _                             => to_s(t)
+    }
+
     object str {
       def brackets(xs: List[_]): String        = if (xs.isEmpty) "" else xs.mkString("[", ", ", "]")
       def tparams(tparams: List[Type]): String = brackets(tparams map debug)
@@ -61,6 +87,6 @@ trait TypeDebugging {
     }
   }
 
-  def debugString(tp: Type) = TypeDebugStrings.debug(tp)
+  def debugString(tp: Type) = typeDebug.debug(tp)
 }
 
